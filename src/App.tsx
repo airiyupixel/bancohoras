@@ -14,29 +14,34 @@ import {
 } from 'firebase/auth';
 import { getFirestore, collection, doc, setDoc, onSnapshot } from 'firebase/firestore';
 
-// Configuração do Firebase injetada automaticamente
-const firebaseConfig = {
-  apiKey: "AIzaSyBsFNVRAcKj8JHxtQcp1ECpENjxjm5UmJI",
+// --- Configuração Inteligente do Firebase ---
+// Verifica se o site está rodando no Vercel ou no ambiente de testes
+const isOficial = typeof __firebase_config === 'undefined';
+
+const firebaseConfig = isOficial ? {
+  // Chaves resgatadas do teu projeto original Ana! ❤️
+  apiKey: "AIzaSyBsFNVRaCKj8JHxtQcp1ECpENjxjm5UmJI",
   authDomain: "meu-banco-de-horas-ana-azzas.firebaseapp.com",
   projectId: "meu-banco-de-horas-ana-azzas",
   storageBucket: "meu-banco-de-horas-ana-azzas.firebasestorage.app",
   messagingSenderId: "190453048565",
   appId: "1:190453048565:web:9c4a4c41480c46f67951bc"
-};
+} : JSON.parse(__firebase_config);
+
 const app = initializeApp(firebaseConfig);
 const auth = getAuth(app);
 const db = getFirestore(app);
-const appId = typeof __app_id !== 'undefined' ? __app_id : 'default-app-id';
+const dbAppId = isOficial ? "meu-banco-de-horas-ana-azzas" : __app_id;
 const googleProvider = new GoogleAuthProvider();
 
 // --- Funções Utilitárias de Tempo ---
-const timeToMins = (timeStr) => {
+const timeToMins = (timeStr: string) => {
   if (!timeStr) return 0;
   const [h, m] = timeStr.split(':').map(Number);
   return (h || 0) * 60 + (m || 0);
 };
 
-const minsToTime = (mins, forceSign = false) => {
+const minsToTime = (mins: number, forceSign = false) => {
   if (isNaN(mins)) return "00:00";
   const isNeg = mins < 0;
   const abs = Math.abs(mins);
@@ -52,14 +57,13 @@ const getTodayString = () => {
 };
 
 // --- Mágica dos Feriados Nacionais ---
-const getBrazilianHolidays = (year) => {
-  const addDays = (date, days) => {
+const getBrazilianHolidays = (year: number): Record<string, string> => {
+  const addDays = (date: Date, days: number) => {
     const result = new Date(date.valueOf());
     result.setDate(result.getDate() + days);
     return `${result.getFullYear()}-${String(result.getMonth()+1).padStart(2,'0')}-${String(result.getDate()).padStart(2,'0')}`;
   };
 
-  // Cálculo da Páscoa para descobrir feriados móveis
   const a = year % 19;
   const b = Math.floor(year / 100);
   const c = year % 100;
@@ -92,13 +96,13 @@ const getBrazilianHolidays = (year) => {
   };
 };
 
-const isDateHoliday = (dateStr) => {
+const isDateHoliday = (dateStr: string) => {
   const [y] = dateStr.split('-');
   const holidays = getBrazilianHolidays(parseInt(y, 10));
   return !!holidays[dateStr];
 };
 
-const getDefaultRecord = (dateStr) => {
+const getDefaultRecord = (dateStr: string) => {
   const [y, m, d] = dateStr.split('-').map(Number);
   const dateObj = new Date(y, m - 1, d);
   const dayOfWeek = dateObj.getDay();
@@ -123,7 +127,7 @@ const getDefaultRecord = (dateStr) => {
   };
 };
 
-const typeConfig = {
+const typeConfig: Record<string, {icon: string, color: string}> = {
   'Trabalho Normal': { icon: '💼', color: 'bg-blue-50 text-blue-700 border-blue-200' },
   'Fim de Semana': { icon: '🛋️', color: 'bg-slate-50 text-slate-500 border-slate-200' },
   'Folga (Banco)': { icon: '🌴', color: 'bg-emerald-50 text-emerald-700 border-emerald-200' },
@@ -135,12 +139,12 @@ const typeConfig = {
 
 export default function App() {
   const [currentDate, setCurrentDate] = useState(getTodayString());
-  const [records, setRecords] = useState({});
-  const [user, setUser] = useState(null);
+  const [records, setRecords] = useState<any>({});
+  const [user, setUser] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [syncStatus, setSyncStatus] = useState('synced');
-  const [pendingSave, setPendingSave] = useState(null);
-  const [weather, setWeather] = useState({});
+  const [pendingSave, setPendingSave] = useState<any>(null);
+  const [weather, setWeather] = useState<any>({});
   
   const urlParams = new URLSearchParams(window.location.search);
   const shareId = urlParams.get('shareId');
@@ -148,13 +152,12 @@ export default function App() {
 
   // --- Previsão do Tempo ---
   useEffect(() => {
-    // Busca previsão do tempo gratuita baseada na região aproximada (Campo Bom/RS)
     fetch('https://api.open-meteo.com/v1/forecast?latitude=-29.6769&longitude=-51.0583&daily=weathercode,temperature_2m_max,temperature_2m_min&timezone=America%2FSao_Paulo')
       .then(res => res.json())
       .then(data => {
         if (data && data.daily) {
-          const weatherMap = {};
-          data.daily.time.forEach((date, index) => {
+          const weatherMap: any = {};
+          data.daily.time.forEach((date: string, index: number) => {
             weatherMap[date] = {
               code: data.daily.weathercode[index],
               max: data.daily.temperature_2m_max[index],
@@ -167,14 +170,14 @@ export default function App() {
       .catch(err => console.log("Não foi possível carregar a previsão do tempo.", err));
   }, []);
 
-  const getWeatherEmoji = (code) => {
-     if (code === 0) return '☀️'; // Limpo
-     if (code >= 1 && code <= 3) return '🌤️'; // Parcialmente nublado
-     if (code >= 45 && code <= 48) return '🌫️'; // Névoa
-     if (code >= 51 && code <= 67) return '🌧️'; // Chuva
-     if (code >= 71 && code <= 77) return '❄️'; // Neve
-     if (code >= 80 && code <= 82) return '🌦️'; // Pancadas
-     if (code >= 95) return '⛈️'; // Tempestade
+  const getWeatherEmoji = (code: number) => {
+     if (code === 0) return '☀️'; 
+     if (code >= 1 && code <= 3) return '🌤️'; 
+     if (code >= 45 && code <= 48) return '🌫️'; 
+     if (code >= 51 && code <= 67) return '🌧️'; 
+     if (code >= 71 && code <= 77) return '❄️'; 
+     if (code >= 80 && code <= 82) return '🌦️'; 
+     if (code >= 95) return '⛈️'; 
      return '🌡️';
   };
 
@@ -182,7 +185,7 @@ export default function App() {
   useEffect(() => {
     const initAuth = async () => {
       try {
-        if (typeof __initial_auth_token !== 'undefined' && __initial_auth_token) {
+        if (!isOficial && typeof __initial_auth_token !== 'undefined' && __initial_auth_token) {
           await signInWithCustomToken(auth, __initial_auth_token);
         } else if (isReadOnly) {
           await signInAnonymously(auth);
@@ -191,6 +194,7 @@ export default function App() {
         }
       } catch (err) {
         console.error("Erro de Autenticação:", err);
+        setLoading(false);
       }
     };
     initAuth();
@@ -221,10 +225,10 @@ export default function App() {
     if (!targetUid) return;
 
     setLoading(true);
-    const recordsRef = collection(db, 'artifacts', appId, 'users', targetUid, 'daily_records');
+    const recordsRef = collection(db, 'artifacts', dbAppId, 'users', targetUid, 'daily_records');
     
     const unsubscribe = onSnapshot(recordsRef, (snapshot) => {
-      const fetchedRecords = {};
+      const fetchedRecords: any = {};
       snapshot.forEach((doc) => {
         fetchedRecords[doc.id] = doc.data();
       });
@@ -247,7 +251,7 @@ export default function App() {
     setSyncStatus('syncing');
     const timer = setTimeout(async () => {
       try {
-        const docRef = doc(db, 'artifacts', appId, 'users', user.uid, 'daily_records', pendingSave.date);
+        const docRef = doc(db, 'artifacts', dbAppId, 'users', user.uid, 'daily_records', pendingSave.date);
         await setDoc(docRef, pendingSave.record);
         setSyncStatus('synced');
       } catch (err) {
@@ -262,10 +266,10 @@ export default function App() {
 
   const currentRecord = records[currentDate] || getDefaultRecord(currentDate);
 
-  const updateField = (field, value) => {
+  const updateField = (field: string, value: any) => {
     if (isReadOnly) return;
 
-    setRecords(prev => {
+    setRecords((prev: any) => {
       const updatedRecord = {
         ...(prev[currentDate] || getDefaultRecord(currentDate)),
         [field]: value
@@ -276,7 +280,7 @@ export default function App() {
     });
   };
 
-  const handleFileUpload = (e) => {
+  const handleFileUpload = (e: any) => {
     const file = e.target.files[0];
     if (file) {
       const reader = new FileReader();
@@ -299,15 +303,14 @@ export default function App() {
     alert("Link copiado! Envie este link para a sua líder.");
   };
 
-  // --- Lógica de Cálculo (Fixado em 6 Horas e Tolerância) ---
-  const calculateDayStats = (record) => {
+  // --- Lógica de Cálculo ---
+  const calculateDayStats = (record: any) => {
     if (!record) return { workedMins: 0, balanceMins: 0 };
     const inM = timeToMins(record.timeIn);
     const lsM = timeToMins(record.lunchStart);
     const leM = timeToMins(record.lunchEnd);
     const outM = timeToMins(record.timeOut);
     
-    // A Ana Paula trabalha sempre 6 horas por dia (360 minutos)
     const reqM = (record.type === 'Fim de Semana' || record.type === 'Feriado' || record.type === 'Folga (Banco)') ? 0 : 360; 
     const medM = record.hasMedicalAbsence ? timeToMins(record.medical) : 0;
     
@@ -322,10 +325,10 @@ export default function App() {
         balanceMins = (workedMins + medM) - reqM;
         break;
       case 'Folga (Banco)':
-      case 'Folga de Feriado': // Folga de Feriado atua descontando as 6h do banco para "gastar" o que ganhou trabalhando no feriado!
+      case 'Folga de Feriado': 
         balanceMins = workedMins - 360; 
         break;
-      case 'Feriado': // Se trabalhar no feriado, ganha 100% das horas positivas (reqM=0)
+      case 'Feriado': 
       case 'Atestado':
       case 'Fim de Semana':
         balanceMins = workedMins; 
@@ -334,7 +337,6 @@ export default function App() {
         balanceMins = 0;
     }
 
-    // Tolerância: 10 minutos pra mais ou pra menos num dia normal não contam!
     if (record.type === 'Trabalho Normal' && Math.abs(balanceMins) <= 10) {
       balanceMins = 0;
     }
@@ -372,7 +374,7 @@ export default function App() {
     );
   }
 
-  if (!user && !isReadOnly && typeof __initial_auth_token === 'undefined') {
+  if (!user && !isReadOnly) {
     return (
       <div className="min-h-screen bg-[#faf5f7] flex flex-col items-center justify-center p-4">
         <div className="bg-white p-8 md:p-12 rounded-[2.5rem] shadow-sm border-2 border-pink-100 max-w-md w-full text-center flex flex-col items-center gap-6">
@@ -416,7 +418,7 @@ export default function App() {
     setCurrentDate(`${y}-${String(m).padStart(2, '0')}-01`);
   };
 
-  const CardValue = ({ title, value, icon: Icon, isPositive, neutral }) => (
+  const CardValue = ({ title, value, icon: Icon, isPositive, neutral }: any) => (
     <div className={`p-4 rounded-3xl border-2 flex items-center gap-4 ${
       neutral ? 'bg-white border-slate-100 text-slate-700' :
       isPositive ? 'bg-emerald-50 border-emerald-100 text-emerald-700' : 
@@ -467,7 +469,7 @@ export default function App() {
               <Share2 size={18} /> Partilhar
             </button>
           )}
-          {user && !isReadOnly && typeof __initial_auth_token === 'undefined' && (
+          {user && !isReadOnly && (
              <button 
                onClick={handleLogout}
                className="bg-white border-2 border-rose-100 text-rose-500 px-4 py-2 rounded-xl font-bold hover:bg-rose-50 transition-colors flex items-center gap-2 text-sm shadow-sm"
@@ -818,7 +820,7 @@ export default function App() {
                 <Cloud size={20} /> Previsão do Tempo (Campo Bom/RS)
               </h3>
               <div className="flex gap-3 overflow-x-auto pb-2 scrollbar-hide">
-                {Object.entries(weather).map(([date, w]) => {
+                {Object.entries(weather).map(([date, w]: any) => {
                    const dateObj = new Date(date + 'T12:00:00');
                    return (
                     <div key={date} className="bg-white p-3 rounded-2xl border-2 border-sky-100 min-w-[70px] flex flex-col items-center flex-shrink-0 shadow-sm">
