@@ -10,7 +10,7 @@ import {
 import { initializeApp } from 'firebase/app';
 import { 
   getAuth, signInWithCustomToken, signInAnonymously, onAuthStateChanged, 
-  GoogleAuthProvider, signInWithPopup, signOut 
+  GoogleAuthProvider, signInWithPopup, signOut, signInWithRedirect, getRedirectResult
 } from 'firebase/auth';
 import { getFirestore, collection, doc, setDoc, onSnapshot } from 'firebase/firestore';
 
@@ -193,6 +193,11 @@ export default function App() {
   useEffect(() => {
     const initAuth = async () => {
       try {
+        // Verifica se está voltando de um redirecionamento do Google
+        await getRedirectResult(auth).catch((err) => {
+          setLoginError(`Erro no redirecionamento: ${err.message}`);
+        });
+
         // @ts-ignore
         if (!isOficial && typeof __initial_auth_token !== 'undefined' && __initial_auth_token) {
           // @ts-ignore
@@ -225,6 +230,17 @@ export default function App() {
       console.error("Erro ao logar", err);
       // Aqui a mágica acontece: Pega o erro do Firebase e joga na tela!
       setLoginError(`Oops! Ocorreu um erro: ${err.message}`);
+      setLoading(false);
+    }
+  };
+
+  const handleGoogleRedirect = async () => {
+    setLoading(true);
+    setLoginError('');
+    try {
+      await signInWithRedirect(auth, googleProvider);
+    } catch (err: any) {
+      setLoginError(`Erro: ${err.message}`);
       setLoading(false);
     }
   };
@@ -413,9 +429,17 @@ export default function App() {
             <LogIn size={24} />
             Entrar com o Google
           </button>
+
+          <button 
+            onClick={handleGoogleRedirect}
+            className="w-full bg-white border-2 border-pink-200 text-pink-600 p-3 rounded-2xl font-bold hover:bg-pink-50 transition-all flex items-center justify-center gap-3 text-sm shadow-sm mt-2"
+          >
+            <LogIn size={18} />
+            Não funciona? Tentar Login Alternativo
+          </button>
           
           {/* O SELO DE GARANTIA: Confirmação visual de que o código atualizou */}
-          <p className="text-[11px] text-slate-400 font-bold mt-2">Versão 2.1 - Atualizado</p>
+          <p className="text-[11px] text-slate-400 font-bold mt-2">Versão 2.2 - Login à Prova de Bala</p>
         </div>
       </div>
     );
