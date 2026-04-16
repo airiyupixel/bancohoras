@@ -196,7 +196,6 @@ export default function App() {
   useEffect(() => {
     setLoading(true);
 
-    // Captura qualquer erro sobrante de tentativas antigas de redirecionamento
     getRedirectResult(auth).catch(err => {
       console.error(err);
       setLoginError("O navegador bloqueou os cookies. Usa o botão de Pop-up (rosa).");
@@ -213,7 +212,16 @@ export default function App() {
           // @ts-ignore
           signInWithCustomToken(auth, __initial_auth_token).catch(() => setLoading(false));
         } else if (isReadOnly) {
-          signInAnonymously(auth).catch(() => setLoading(false));
+          // 🚨 Tentativa de Login Anónimo para a Líder 🚨
+          signInAnonymously(auth).catch((err: any) => {
+            console.error("Erro no login anónimo:", err);
+            if (err.code === 'auth/operation-not-allowed') {
+              setLoginError("🔒 ACESSO NEGADO: A Ana precisa de ativar o 'Login Anónimo' no Firebase dela!");
+            } else {
+              setLoginError(`Erro na partilha: ${err.message}`);
+            }
+            setLoading(false);
+          });
         } else {
           setLoading(false);
         }
@@ -227,11 +235,9 @@ export default function App() {
     setLoading(true);
     setLoginError('');
     try {
-      // Usamos EXCLUSIVAMENTE o Pop-up
       await signInWithPopup(auth, googleProvider);
     } catch (err: any) {
       console.error("Erro no Popup:", err);
-      // O detetive descobre se a janela foi bloqueada pelo navegador
       if (err.code === 'auth/popup-blocked' || err.code === 'auth/popup-closed-by-user') {
         setLoginError('🚫 O TEU NAVEGADOR BLOQUEOU O LOGIN! Olha para a barra de endereço lá em cima, clica no ícone de "Pop-up bloqueado" e permite as janelas para este site. Depois clica novamente no botão!');
       } else {
@@ -260,9 +266,14 @@ export default function App() {
       setRecords(fetchedRecords);
       setLoading(false);
       setSyncStatus('synced');
-    }, (error) => {
+    }, (error: any) => {
       console.error("Erro na nuvem:", error);
-      setSyncStatus('error');
+      // 🚨 Deteta se o Firestore bloqueou a leitura da Líder 🚨
+      if (error.code === 'permission-denied') {
+        setSyncStatus('permission-denied');
+      } else {
+        setSyncStatus('error');
+      }
       setLoading(false);
     });
 
@@ -406,7 +417,8 @@ export default function App() {
     );
   }
 
-  if (!user && !isReadOnly) {
+  // Só mostra a tela de login se não houver utilizador logado E (não for modo líder OU houver um erro no login do líder)
+  if (!user && (!isReadOnly || loginError)) {
     return (
       <div className="min-h-screen bg-[#faf5f7] flex flex-col items-center justify-center p-4">
         <div className="bg-white p-8 md:p-12 rounded-[2.5rem] shadow-sm border-2 border-pink-100 max-w-md w-full text-center flex flex-col items-center gap-6">
@@ -415,7 +427,9 @@ export default function App() {
           </div>
           <div>
             <h1 className="text-3xl font-extrabold text-slate-800 tracking-tight mb-2">Banco de Horas</h1>
-            <p className="text-slate-500 font-medium">Inicie sessão para aceder ao seu painel.</p>
+            <p className="text-slate-500 font-medium">
+              {isReadOnly ? 'Erro ao aceder à visão da líder.' : 'Inicie sessão para aceder ao seu painel.'}
+            </p>
           </div>
 
           {/* O DETETIVE DE ERROS */}
@@ -425,16 +439,18 @@ export default function App() {
             </div>
           )}
 
-          <button 
-            onClick={handleGooglePopup}
-            className="w-full bg-pink-500 text-white p-4 rounded-2xl font-bold hover:bg-pink-600 transition-all flex items-center justify-center gap-3 text-lg shadow-md mt-4"
-          >
-            <LogIn size={24} />
-            Entrar de forma Segura
-          </button>
+          {!isReadOnly && (
+            <button 
+              onClick={handleGooglePopup}
+              className="w-full bg-pink-500 text-white p-4 rounded-2xl font-bold hover:bg-pink-600 transition-all flex items-center justify-center gap-3 text-lg shadow-md mt-4"
+            >
+              <LogIn size={24} />
+              Entrar de forma Segura
+            </button>
+          )}
           
           {/* O SELO DE GARANTIA */}
-          <p className="text-[11px] text-slate-400 font-bold mt-2">Versão 2.7 - Folga Inteligente & Presencial</p>
+          <p className="text-[11px] text-slate-400 font-bold mt-2">Versão 2.9 - Modo Líder Aprimorado</p>
         </div>
       </div>
     );
@@ -461,6 +477,12 @@ export default function App() {
     setCurrentDate(`${y}-${String(m).padStart(2, '0')}-01`);
   };
 
+  // Obter Feriados do Mês Atual
+  const allHolidaysThisYear = getBrazilianHolidays(viewYear);
+  const holidaysThisMonth = Object.entries(allHolidaysThisYear)
+    .filter(([dateStr]) => parseInt(dateStr.split('-')[1], 10) === viewMonth)
+    .sort(([dateA], [dateB]) => dateA.localeCompare(dateB));
+
   const CardValue = ({ title, value, icon: Icon, isPositive, neutral }: any) => (
     <div className={`p-4 rounded-3xl border-2 flex items-center gap-4 ${
       neutral ? 'bg-white border-slate-100 text-slate-700' :
@@ -481,8 +503,16 @@ export default function App() {
     <div className="min-h-screen bg-[#faf5f7] text-slate-800 font-sans p-4 md:p-8 selection:bg-pink-200">
       
       {isReadOnly && (
-        <div className="max-w-7xl mx-auto mb-6 bg-blue-100 text-blue-700 p-3 rounded-2xl font-bold flex items-center justify-center gap-2 border-2 border-blue-200 shadow-sm">
-          <Eye size={20} /> Modo de Visualização do Líder
+        <div className="max-w-7xl mx-auto mb-6 flex flex-col gap-3">
+          <div className="bg-blue-100 text-blue-700 p-3 rounded-2xl font-bold flex items-center justify-center gap-2 border-2 border-blue-200 shadow-sm">
+            <Eye size={20} /> Modo de Visualização da Líder
+          </div>
+          {syncStatus === 'permission-denied' && (
+            <div className="bg-rose-100 text-rose-700 p-4 rounded-2xl font-bold flex items-center justify-center gap-2 border-2 border-rose-200 shadow-sm text-sm text-center">
+              <AlertCircle size={24} className="flex-shrink-0" /> 
+              🔒 ACESSO BLOQUEADO: A Ana precisa de ir ao Firebase e atualizar as regras do Firestore para permitir a leitura.
+            </div>
+          )}
         </div>
       )}
 
@@ -561,7 +591,6 @@ export default function App() {
                 </select>
 
                 <div className="flex gap-2 bg-slate-50 p-1.5 rounded-2xl border-2 border-slate-100">
-                  {/* Presencial vem primeiro agora! */}
                   {['Presencial', 'Home Office'].map(model => (
                     <button
                       key={model}
@@ -615,7 +644,6 @@ export default function App() {
               <div className="mt-4 flex items-center justify-between bg-white p-3 rounded-2xl text-sm border border-purple-100 font-bold text-purple-900">
                 <span>Total trabalhado:</span>
                 <span className="text-lg bg-purple-100 px-3 py-1 rounded-xl">
-                  {/* Se for folga, já diz automaticamente que são 6h e não mostra as horas digitadas */}
                   {isFolga ? '06:00 (Folga)' : minsToTime(workedMins)}
                 </span>
               </div>
@@ -767,7 +795,6 @@ export default function App() {
 
         {/* Coluna Direita: Calendário e Clima */}
         <div className="lg:col-span-5">
-          {/* Caixa mestra que gruda no topo para os dois itens acompanharem juntos a rolagem da página */}
           <div className="sticky top-8 flex flex-col gap-6">
             
             {/* O Calendário */}
@@ -821,7 +848,6 @@ export default function App() {
 
                   const config = record ? typeConfig[record.type] : (isWeekend ? typeConfig['Fim de Semana'] : (isNationalHoliday ? typeConfig['Feriado'] : null));
                   
-                  // Mágica do Home Office: Se for dia normal e home office, mostra casinha!
                   const isHomeOffice = record && record.type === 'Trabalho Normal' && record.workModel === 'Home Office';
                   const displayIcon = isHomeOffice ? '🏠' : (config ? config.icon : '');
                   
@@ -852,6 +878,29 @@ export default function App() {
                   )
                 })}
               </div>
+
+              {/* Legenda de Feriados do Mês - Novo Bloco */}
+              {holidaysThisMonth.length > 0 && (
+                <div className="bg-rose-50/50 p-3 md:p-4 rounded-2xl border-2 border-rose-100 mb-4">
+                  <h4 className="text-xs font-extrabold text-rose-600 mb-3 flex items-center gap-1.5 uppercase tracking-wide">
+                    <span className="w-2 h-2 rounded-full bg-rose-500 inline-block animate-pulse shadow-sm"></span> 
+                    Feriados neste mês
+                  </h4>
+                  <div className="flex flex-col gap-2">
+                    {holidaysThisMonth.map(([date, name]) => {
+                      const day = parseInt(date.split('-')[2], 10);
+                      return (
+                        <div key={date} className="flex justify-between items-center bg-white px-3 py-2 rounded-xl border border-rose-50 shadow-sm">
+                          <span className="text-xs font-bold text-slate-700">{name}</span>
+                          <span className="text-[10px] font-extrabold bg-rose-100 text-rose-600 px-2 py-0.5 rounded-lg border border-rose-200">
+                            Dia {day}
+                          </span>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
 
               <div className="bg-slate-50 p-3 md:p-4 rounded-2xl border-2 border-slate-100">
                 <div className="flex flex-wrap gap-2 justify-center">
