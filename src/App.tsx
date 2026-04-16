@@ -128,7 +128,7 @@ const getDefaultRecord = (dateStr: string) => {
     medical: '',
     hasMedicalAbsence: false,
     medicalAttachment: null,
-    workModel: 'Home Office',
+    workModel: 'Presencial', // Definido como Presencial por padrão
     agenda: '',
     noAgenda: false,
     mood: '🙂',
@@ -291,6 +291,9 @@ export default function App() {
 
   const currentRecord = records[currentDate] || getDefaultRecord(currentDate);
 
+  // Verificação de Folga Inteligente
+  const isFolga = currentRecord.type === 'Folga (Banco)' || currentRecord.type === 'Folga de Feriado';
+
   const updateField = (field: string, value: any) => {
     if (isReadOnly) return;
 
@@ -336,7 +339,7 @@ export default function App() {
     const leM = timeToMins(record.lunchEnd);
     const outM = timeToMins(record.timeOut);
     
-    const reqM = (record.type === 'Fim de Semana' || record.type === 'Feriado' || record.type === 'Folga (Banco)') ? 0 : 360; 
+    const reqM = (record.type === 'Fim de Semana' || record.type === 'Feriado' || record.type === 'Folga (Banco)' || record.type === 'Folga de Feriado') ? 0 : 360; 
     const medM = record.hasMedicalAbsence ? timeToMins(record.medical) : 0;
     
     let workedMins = 0;
@@ -350,8 +353,12 @@ export default function App() {
         balanceMins = (workedMins + medM) - reqM;
         break;
       case 'Folga (Banco)':
+        // Usou banco de horas: desconta 6 horas (-360 mins)
+        balanceMins = -360; 
+        break;
       case 'Folga de Feriado': 
-        balanceMins = workedMins - 360; 
+        // A empresa deu a folga: saldo fica neutro (0) para não tirar do teu banco
+        balanceMins = 0; 
         break;
       case 'Feriado': 
       case 'Atestado':
@@ -427,7 +434,7 @@ export default function App() {
           </button>
           
           {/* O SELO DE GARANTIA */}
-          <p className="text-[11px] text-slate-400 font-bold mt-2">Versão 2.6 - Ajuste de Layout</p>
+          <p className="text-[11px] text-slate-400 font-bold mt-2">Versão 2.7 - Folga Inteligente & Presencial</p>
         </div>
       </div>
     );
@@ -554,18 +561,19 @@ export default function App() {
                 </select>
 
                 <div className="flex gap-2 bg-slate-50 p-1.5 rounded-2xl border-2 border-slate-100">
-                  {['Home Office', 'Presencial'].map(model => (
+                  {/* Presencial vem primeiro agora! */}
+                  {['Presencial', 'Home Office'].map(model => (
                     <button
                       key={model}
                       disabled={isReadOnly}
                       onClick={() => updateField('workModel', model)}
-                      className={`flex-1 py-1.5 rounded-xl text-xs font-bold flex items-center justify-center gap-1 ${
+                      className={`flex-1 py-1.5 rounded-xl text-xs font-bold flex items-center justify-center gap-1 transition-colors ${
                         currentRecord.workModel === model 
                           ? 'bg-white text-purple-600 shadow-sm' 
-                          : 'text-slate-400'
+                          : 'text-slate-400 hover:bg-slate-100'
                       }`}
                     >
-                      {model === 'Home Office' ? <Home size={14}/> : <Building size={14}/>} {model}
+                      {model === 'Presencial' ? <Building size={14}/> : <Home size={14}/>} {model}
                     </button>
                   ))}
                 </div>
@@ -586,13 +594,19 @@ export default function App() {
                   { label: 'Saída', field: 'timeOut', icon: '🌆' }
                 ].map(item => (
                   <div key={item.field} className="flex flex-col gap-1">
-                    <label className="text-xs font-bold text-purple-600/70 ml-1">{item.icon} {item.label}</label>
+                    <label className={`text-xs font-bold ml-1 ${isFolga ? 'text-slate-400' : 'text-purple-600/70'}`}>
+                      {item.icon} {item.label}
+                    </label>
                     <input 
                       type="time" 
-                      disabled={isReadOnly}
-                      value={currentRecord[item.field]}
+                      disabled={isReadOnly || isFolga}
+                      value={isFolga ? '' : currentRecord[item.field]}
                       onChange={(e) => updateField(item.field, e.target.value)}
-                      className="w-full bg-white border-2 border-purple-100 rounded-xl p-2.5 font-bold text-purple-900 outline-none"
+                      className={`w-full border-2 rounded-xl p-2.5 font-bold outline-none transition-all ${
+                        isFolga 
+                          ? 'bg-slate-100 border-slate-200 text-slate-400 cursor-not-allowed' 
+                          : 'bg-white border-purple-100 text-purple-900'
+                      }`}
                     />
                   </div>
                 ))}
@@ -600,7 +614,10 @@ export default function App() {
 
               <div className="mt-4 flex items-center justify-between bg-white p-3 rounded-2xl text-sm border border-purple-100 font-bold text-purple-900">
                 <span>Total trabalhado:</span>
-                <span className="text-lg bg-purple-100 px-3 py-1 rounded-xl">{minsToTime(workedMins)}</span>
+                <span className="text-lg bg-purple-100 px-3 py-1 rounded-xl">
+                  {/* Se for folga, já diz automaticamente que são 6h e não mostra as horas digitadas */}
+                  {isFolga ? '06:00 (Folga)' : minsToTime(workedMins)}
+                </span>
               </div>
             </div>
 
