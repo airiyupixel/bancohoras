@@ -427,7 +427,7 @@ export default function App() {
           </button>
           
           {/* O SELO DE GARANTIA */}
-          <p className="text-[11px] text-slate-400 font-bold mt-2">Versão 2.5 - Sistema Anti-Bloqueio</p>
+          <p className="text-[11px] text-slate-400 font-bold mt-2">Versão 2.6 - Ajuste de Layout</p>
         </div>
       </div>
     );
@@ -749,128 +749,132 @@ export default function App() {
         </div>
 
         {/* Coluna Direita: Calendário e Clima */}
-        <div className="lg:col-span-5 relative flex flex-col gap-6">
-          <div className="bg-white p-6 rounded-[2.5rem] shadow-sm border-2 border-purple-50 sticky top-8">
-            <div className="flex flex-col items-center justify-between mb-6 gap-4">
-              <div className="flex items-center gap-3 w-full">
-                <div className="bg-indigo-100 p-3 rounded-2xl text-indigo-600 flex-shrink-0">
-                  <Calendar size={24} />
-                </div>
-                <div>
-                  <h2 className="text-xl font-bold text-slate-800">Visão Mensal</h2>
-                </div>
-              </div>
-
-              <div className="flex items-center gap-1 bg-indigo-50 p-1.5 rounded-2xl border-2 border-indigo-100 w-full justify-between">
-                <button onClick={handlePrevMonth} className="p-2 hover:bg-white rounded-xl text-indigo-600 transition-all">
-                  <ChevronLeft size={20} />
-                </button>
-                <input
-                  type="month"
-                  value={`${viewYear}-${String(viewMonth).padStart(2, '0')}`}
-                  onChange={(e) => {
-                    const [y, m] = e.target.value.split('-');
-                    if (y && m) setCurrentDate(`${y}-${m}-01`);
-                  }}
-                  className="bg-transparent border-none text-indigo-800 font-bold text-lg p-2 text-center outline-none cursor-pointer uppercase w-full"
-                />
-                <button onClick={handleNextMonth} className="p-2 hover:bg-white rounded-xl text-indigo-600 transition-all">
-                  <ChevronRight size={20} />
-                </button>
-              </div>
-            </div>
-
-            <div className="grid grid-cols-7 gap-1 md:gap-2 mb-6">
-              {['Dom', 'Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb'].map(day => (
-                <div key={day} className="text-center text-xs font-bold text-slate-400 py-1 uppercase">{day}</div>
-              ))}
-              
-              {Array.from({ length: firstDayIndex }).map((_, i) => (<div key={`empty-${i}`} className="p-1" />))}
-              
-              {Array.from({ length: daysInMonth }).map((_, i) => {
-                const dayNum = i + 1;
-                const dateStr = `${viewYear}-${String(viewMonth).padStart(2, '0')}-${String(dayNum).padStart(2, '0')}`;
-                const record = records[dateStr];
-                
-                const dateObj = new Date(viewYear, viewMonth - 1, dayNum);
-                const isWeekend = dateObj.getDay() === 0 || dateObj.getDay() === 6;
-                const isNationalHoliday = isDateHoliday(dateStr);
-                const holidayName = isNationalHoliday ? getBrazilianHolidays(viewYear)[dateStr] : '';
-                const weatherToday = weather[dateStr];
-
-                const config = record ? typeConfig[record.type] : (isWeekend ? typeConfig['Fim de Semana'] : (isNationalHoliday ? typeConfig['Feriado'] : null));
-                
-                // Mágica do Home Office: Se for dia normal e home office, mostra casinha!
-                const isHomeOffice = record && record.type === 'Trabalho Normal' && record.workModel === 'Home Office';
-                const displayIcon = isHomeOffice ? '🏠' : (config ? config.icon : '');
-                
-                const isSelected = dateStr === currentDate;
-
-                return (
-                  <button
-                    key={dayNum}
-                    title={holidayName}
-                    onClick={() => setCurrentDate(dateStr)}
-                    className={`relative flex flex-col items-center justify-center p-1 rounded-xl border-2 transition-all min-h-[3.5rem] md:min-h-[4.5rem] ${
-                      isSelected ? 'ring-4 ring-pink-300 ring-offset-1 scale-105 z-10' : 'hover:scale-105'
-                    } ${config ? config.color : 'bg-slate-50 border-slate-100 text-slate-400'}
-                      ${isNationalHoliday && !isSelected ? 'ring-2 ring-rose-200' : ''}`}
-                  >
-                    {isNationalHoliday && (
-                      <div title={holidayName} className="absolute top-1 right-1 w-2 h-2 rounded-full bg-rose-500 shadow-sm animate-pulse"></div>
-                    )}
-                    {weatherToday && (
-                      <div className="absolute top-1 left-1 text-[10px] opacity-70">
-                        {getWeatherEmoji(weatherToday.code)}
-                      </div>
-                    )}
-
-                    <span className="font-extrabold text-xs md:text-sm">{dayNum}</span>
-                    <span className="text-lg md:text-xl mt-0.5">{displayIcon}</span>
-                  </button>
-                )
-              })}
-            </div>
-
-            <div className="bg-slate-50 p-3 md:p-4 rounded-2xl border-2 border-slate-100">
-              <div className="flex flex-wrap gap-2 justify-center">
-                <div className="flex items-center gap-1.5 text-xs font-bold px-2 py-1 rounded-lg border-2 bg-blue-50 text-blue-700 border-blue-200">
-                   <span>🏠</span> Home Office
-                </div>
-                {Object.entries(typeConfig).map(([type, config]) => (
-                  <div key={type} className={`flex items-center gap-1.5 text-xs font-bold px-2 py-1 rounded-lg border-2 ${config.color}`}>
-                    <span>{config.icon}</span> {type}
+        <div className="lg:col-span-5">
+          {/* Caixa mestra que gruda no topo para os dois itens acompanharem juntos a rolagem da página */}
+          <div className="sticky top-8 flex flex-col gap-6">
+            
+            {/* O Calendário */}
+            <div className="bg-white p-6 rounded-[2.5rem] shadow-sm border-2 border-purple-50">
+              <div className="flex flex-col items-center justify-between mb-6 gap-4">
+                <div className="flex items-center gap-3 w-full">
+                  <div className="bg-indigo-100 p-3 rounded-2xl text-indigo-600 flex-shrink-0">
+                    <Calendar size={24} />
                   </div>
-                ))}
-                <div className="flex items-center gap-1.5 text-xs font-bold px-2 py-1 rounded-lg border-2 bg-white text-slate-600 border-slate-200">
-                   <span className="w-2 h-2 rounded-full bg-rose-500 inline-block"></span> Feriado Nacional
+                  <div>
+                    <h2 className="text-xl font-bold text-slate-800">Visão Mensal</h2>
+                  </div>
+                </div>
+
+                <div className="flex items-center gap-1 bg-indigo-50 p-1.5 rounded-2xl border-2 border-indigo-100 w-full justify-between">
+                  <button onClick={handlePrevMonth} className="p-2 hover:bg-white rounded-xl text-indigo-600 transition-all">
+                    <ChevronLeft size={20} />
+                  </button>
+                  <input
+                    type="month"
+                    value={`${viewYear}-${String(viewMonth).padStart(2, '0')}`}
+                    onChange={(e) => {
+                      const [y, m] = e.target.value.split('-');
+                      if (y && m) setCurrentDate(`${y}-${m}-01`);
+                    }}
+                    className="bg-transparent border-none text-indigo-800 font-bold text-lg p-2 text-center outline-none cursor-pointer uppercase w-full"
+                  />
+                  <button onClick={handleNextMonth} className="p-2 hover:bg-white rounded-xl text-indigo-600 transition-all">
+                    <ChevronRight size={20} />
+                  </button>
                 </div>
               </div>
-            </div>
-          </div>
 
-          {/* Módulo de Previsão do Tempo Exclusivo */}
-          {Object.keys(weather).length > 0 && (
-            <div className="bg-gradient-to-br from-sky-50 to-blue-50 p-6 rounded-[2.5rem] shadow-sm border-2 border-sky-100 sticky top-[600px]">
-              <h3 className="font-bold text-sky-800 mb-4 flex items-center gap-2">
-                <Cloud size={20} /> Previsão do Tempo (Campo Bom/RS)
-              </h3>
-              <div className="flex gap-3 overflow-x-auto pb-2 scrollbar-hide">
-                {Object.entries(weather).map(([date, w]: any) => {
-                   const dateObj = new Date(date + 'T12:00:00');
-                   return (
-                    <div key={date} className="bg-white p-3 rounded-2xl border-2 border-sky-100 min-w-[70px] flex flex-col items-center flex-shrink-0 shadow-sm">
-                      <span className="text-[10px] font-bold text-slate-400 mb-1 uppercase">{dateObj.toLocaleDateString('pt-BR', {weekday: 'short'})}</span>
-                      <span className="text-2xl mb-1">{getWeatherEmoji(w.code)}</span>
-                      <span className="text-sm font-black text-sky-900">{Math.round(w.max)}°</span>
-                      <span className="text-xs font-bold text-sky-400">{Math.round(w.min)}°</span>
-                    </div>
-                  );
+              <div className="grid grid-cols-7 gap-1 md:gap-2 mb-6">
+                {['Dom', 'Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb'].map(day => (
+                  <div key={day} className="text-center text-xs font-bold text-slate-400 py-1 uppercase">{day}</div>
+                ))}
+                
+                {Array.from({ length: firstDayIndex }).map((_, i) => (<div key={`empty-${i}`} className="p-1" />))}
+                
+                {Array.from({ length: daysInMonth }).map((_, i) => {
+                  const dayNum = i + 1;
+                  const dateStr = `${viewYear}-${String(viewMonth).padStart(2, '0')}-${String(dayNum).padStart(2, '0')}`;
+                  const record = records[dateStr];
+                  
+                  const dateObj = new Date(viewYear, viewMonth - 1, dayNum);
+                  const isWeekend = dateObj.getDay() === 0 || dateObj.getDay() === 6;
+                  const isNationalHoliday = isDateHoliday(dateStr);
+                  const holidayName = isNationalHoliday ? getBrazilianHolidays(viewYear)[dateStr] : '';
+                  const weatherToday = weather[dateStr];
+
+                  const config = record ? typeConfig[record.type] : (isWeekend ? typeConfig['Fim de Semana'] : (isNationalHoliday ? typeConfig['Feriado'] : null));
+                  
+                  // Mágica do Home Office: Se for dia normal e home office, mostra casinha!
+                  const isHomeOffice = record && record.type === 'Trabalho Normal' && record.workModel === 'Home Office';
+                  const displayIcon = isHomeOffice ? '🏠' : (config ? config.icon : '');
+                  
+                  const isSelected = dateStr === currentDate;
+
+                  return (
+                    <button
+                      key={dayNum}
+                      title={holidayName}
+                      onClick={() => setCurrentDate(dateStr)}
+                      className={`relative flex flex-col items-center justify-center p-1 rounded-xl border-2 transition-all min-h-[3.5rem] md:min-h-[4.5rem] ${
+                        isSelected ? 'ring-4 ring-pink-300 ring-offset-1 scale-105 z-10' : 'hover:scale-105'
+                      } ${config ? config.color : 'bg-slate-50 border-slate-100 text-slate-400'}
+                        ${isNationalHoliday && !isSelected ? 'ring-2 ring-rose-200' : ''}`}
+                    >
+                      {isNationalHoliday && (
+                        <div title={holidayName} className="absolute top-1 right-1 w-2 h-2 rounded-full bg-rose-500 shadow-sm animate-pulse"></div>
+                      )}
+                      {weatherToday && (
+                        <div className="absolute top-1 left-1 text-[10px] opacity-70">
+                          {getWeatherEmoji(weatherToday.code)}
+                        </div>
+                      )}
+
+                      <span className="font-extrabold text-xs md:text-sm">{dayNum}</span>
+                      <span className="text-lg md:text-xl mt-0.5">{displayIcon}</span>
+                    </button>
+                  )
                 })}
               </div>
-            </div>
-          )}
 
+              <div className="bg-slate-50 p-3 md:p-4 rounded-2xl border-2 border-slate-100">
+                <div className="flex flex-wrap gap-2 justify-center">
+                  <div className="flex items-center gap-1.5 text-xs font-bold px-2 py-1 rounded-lg border-2 bg-blue-50 text-blue-700 border-blue-200">
+                     <span>🏠</span> Home Office
+                  </div>
+                  {Object.entries(typeConfig).map(([type, config]) => (
+                    <div key={type} className={`flex items-center gap-1.5 text-xs font-bold px-2 py-1 rounded-lg border-2 ${config.color}`}>
+                      <span>{config.icon}</span> {type}
+                    </div>
+                  ))}
+                  <div className="flex items-center gap-1.5 text-xs font-bold px-2 py-1 rounded-lg border-2 bg-white text-slate-600 border-slate-200">
+                     <span className="w-2 h-2 rounded-full bg-rose-500 inline-block"></span> Feriado Nacional
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* Módulo de Previsão do Tempo Exclusivo */}
+            {Object.keys(weather).length > 0 && (
+              <div className="bg-gradient-to-br from-sky-50 to-blue-50 p-6 rounded-[2.5rem] shadow-sm border-2 border-sky-100">
+                <h3 className="font-bold text-sky-800 mb-4 flex items-center gap-2">
+                  <Cloud size={20} /> Previsão do Tempo (Campo Bom/RS)
+                </h3>
+                <div className="flex gap-3 overflow-x-auto pb-2 scrollbar-hide">
+                  {Object.entries(weather).map(([date, w]: any) => {
+                     const dateObj = new Date(date + 'T12:00:00');
+                     return (
+                      <div key={date} className="bg-white p-3 rounded-2xl border-2 border-sky-100 min-w-[70px] flex flex-col items-center flex-shrink-0 shadow-sm">
+                        <span className="text-[10px] font-bold text-slate-400 mb-1 uppercase">{dateObj.toLocaleDateString('pt-BR', {weekday: 'short'})}</span>
+                        <span className="text-2xl mb-1">{getWeatherEmoji(w.code)}</span>
+                        <span className="text-sm font-black text-sky-900">{Math.round(w.max)}°</span>
+                        <span className="text-xs font-bold text-sky-400">{Math.round(w.min)}°</span>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
+          </div>
         </div>
       </div>
 
