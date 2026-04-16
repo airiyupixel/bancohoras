@@ -15,23 +15,30 @@ import {
 import { getFirestore, collection, doc, setDoc, onSnapshot } from 'firebase/firestore';
 
 // --- Configuração Inteligente do Firebase ---
-// Verifica se o site está rodando no Vercel ou no ambiente de testes
+// @ts-ignore
 const isOficial = typeof __firebase_config === 'undefined';
 
-const firebaseConfig = isOficial ? {
-  // Chaves resgatadas do teu projeto original Ana! ❤️
-  apiKey: "AIzaSyBsFNVRaCKj8JHxtQcp1ECpENjxjm5UmJI",
-  authDomain: "meu-banco-de-horas-ana-azzas.firebaseapp.com",
-  projectId: "meu-banco-de-horas-ana-azzas",
-  storageBucket: "meu-banco-de-horas-ana-azzas.firebasestorage.app",
-  messagingSenderId: "190453048565",
-  appId: "1:190453048565:web:9c4a4c41480c46f67951bc"
-} : JSON.parse(__firebase_config);
+const getFirebaseConfig = () => {
+  if (isOficial) {
+    return {
+      // Chaves resgatadas do teu projeto original Ana! ❤️
+      apiKey: "AIzaSyBsFNVRaCKj8JHxtQcp1ECpENjxjm5UmJI",
+      authDomain: "meu-banco-de-horas-ana-azzas.firebaseapp.com",
+      projectId: "meu-banco-de-horas-ana-azzas",
+      storageBucket: "meu-banco-de-horas-ana-azzas.firebasestorage.app",
+      messagingSenderId: "190453048565",
+      appId: "1:190453048565:web:9c4a4c41480c46f67951bc"
+    };
+  }
+  // @ts-ignore
+  return JSON.parse(__firebase_config);
+};
 
-const app = initializeApp(firebaseConfig);
+const app = initializeApp(getFirebaseConfig());
 const auth = getAuth(app);
 const db = getFirestore(app);
-const dbAppId = isOficial ? "meu-banco-de-horas-ana-azzas" : __app_id;
+// @ts-ignore
+const dbAppId = isOficial ? "meu-banco-de-horas-ana-azzas" : (typeof __app_id !== 'undefined' ? __app_id : 'default-app-id');
 const googleProvider = new GoogleAuthProvider();
 
 // --- Funções Utilitárias de Tempo ---
@@ -145,6 +152,7 @@ export default function App() {
   const [syncStatus, setSyncStatus] = useState('synced');
   const [pendingSave, setPendingSave] = useState<any>(null);
   const [weather, setWeather] = useState<any>({});
+  const [loginError, setLoginError] = useState(''); // Estado para capturar o erro
   
   const urlParams = new URLSearchParams(window.location.search);
   const shareId = urlParams.get('shareId');
@@ -185,7 +193,9 @@ export default function App() {
   useEffect(() => {
     const initAuth = async () => {
       try {
+        // @ts-ignore
         if (!isOficial && typeof __initial_auth_token !== 'undefined' && __initial_auth_token) {
+          // @ts-ignore
           await signInWithCustomToken(auth, __initial_auth_token);
         } else if (isReadOnly) {
           await signInAnonymously(auth);
@@ -208,10 +218,13 @@ export default function App() {
 
   const handleGoogleLogin = async () => {
     setLoading(true);
+    setLoginError(''); // Limpa erros antigos antes de tentar
     try {
       await signInWithPopup(auth, googleProvider);
-    } catch (err) {
+    } catch (err: any) {
       console.error("Erro ao logar", err);
+      // Aqui a mágica acontece: Pega o erro do Firebase e joga na tela!
+      setLoginError(`Oops! Ocorreu um erro: ${err.message}`);
       setLoading(false);
     }
   };
@@ -385,6 +398,14 @@ export default function App() {
             <h1 className="text-3xl font-extrabold text-slate-800 tracking-tight mb-2">Banco de Horas</h1>
             <p className="text-slate-500 font-medium">Faça login para aceder ao seu painel.</p>
           </div>
+
+          {/* O DETETIVE DE ERROS: Se der erro, aparece aqui na cor vermelha! */}
+          {loginError && (
+            <div className="bg-rose-50 border border-rose-200 text-rose-700 p-4 rounded-xl text-xs font-bold text-left w-full break-words">
+              {loginError}
+            </div>
+          )}
+
           <button 
             onClick={handleGoogleLogin}
             className="w-full bg-pink-500 text-white p-4 rounded-2xl font-bold hover:bg-pink-600 transition-all flex items-center justify-center gap-3 text-lg shadow-md mt-4"
@@ -392,6 +413,9 @@ export default function App() {
             <LogIn size={24} />
             Entrar com o Google
           </button>
+          
+          {/* O SELO DE GARANTIA: Confirmação visual de que o código atualizou */}
+          <p className="text-[11px] text-slate-400 font-bold mt-2">Versão 2.1 - Atualizado</p>
         </div>
       </div>
     );
