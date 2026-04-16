@@ -10,7 +10,7 @@ import {
 import { initializeApp } from 'firebase/app';
 import { 
   getAuth, signInWithCustomToken, signInAnonymously, onAuthStateChanged, 
-  GoogleAuthProvider, signInWithPopup, signOut, signInWithRedirect, getRedirectResult
+  GoogleAuthProvider, signOut, signInWithRedirect, getRedirectResult
 } from 'firebase/auth';
 import { getFirestore, collection, doc, setDoc, onSnapshot } from 'firebase/firestore';
 
@@ -20,15 +20,17 @@ const isOficial = typeof __firebase_config === 'undefined';
 
 const getFirebaseConfig = () => {
   if (isOficial) {
+    // 👇👇👇👇👇👇👇👇👇👇👇👇👇👇👇👇👇👇👇👇👇👇👇👇👇👇👇👇👇👇👇👇👇👇👇
+    // 🚨 ANA: SUBSTITUI ESTE BLOCO PELAS TUAS CHAVES EXATAS DO FIREBASE! 🚨
     return {
-      // Chaves resgatadas do teu projeto original Ana! ❤️
-      apiKey: "AIzaSyBsFNVRaCKj8JHxtQcp1ECpENjxjm5UmJI",
+      apiKey: "AIzaSyBsFNVRAcKj8JHxtQcp1ECpENjxjm5UmJI", 
       authDomain: "meu-banco-de-horas-ana-azzas.firebaseapp.com",
       projectId: "meu-banco-de-horas-ana-azzas",
       storageBucket: "meu-banco-de-horas-ana-azzas.firebasestorage.app",
       messagingSenderId: "190453048565",
       appId: "1:190453048565:web:9c4a4c41480c46f67951bc"
     };
+    // 👆👆👆👆👆👆👆👆👆👆👆👆👆👆👆👆👆👆👆👆👆👆👆👆👆👆👆👆👆👆👆👆👆👆👆
   }
   // @ts-ignore
   return JSON.parse(__firebase_config);
@@ -39,7 +41,12 @@ const auth = getAuth(app);
 const db = getFirestore(app);
 // @ts-ignore
 const dbAppId = isOficial ? "meu-banco-de-horas-ana-azzas" : (typeof __app_id !== 'undefined' ? __app_id : 'default-app-id');
+
+// Configuração para FORÇAR o Google a mostrar a tela e evitar que feche sozinho
 const googleProvider = new GoogleAuthProvider();
+googleProvider.setCustomParameters({
+  prompt: 'select_account'
+});
 
 // --- Funções Utilitárias de Tempo ---
 const timeToMins = (timeStr: string) => {
@@ -189,14 +196,16 @@ export default function App() {
      return '🌡️';
   };
 
-  // --- Autenticação ---
+  // --- Autenticação (Focada 100% em Redirecionamento) ---
   useEffect(() => {
     const initAuth = async () => {
       try {
-        // Verifica se está voltando de um redirecionamento do Google
-        await getRedirectResult(auth).catch((err) => {
-          setLoginError(`Erro no redirecionamento: ${err.message}`);
-        });
+        // Passo 1: Verifica se o utilizador acabou de voltar do site do Google
+        const redirectResult = await getRedirectResult(auth);
+        if (redirectResult?.user) {
+          // Se voltou com sucesso, não precisa fazer mais nada
+          return;
+        }
 
         // @ts-ignore
         if (!isOficial && typeof __initial_auth_token !== 'undefined' && __initial_auth_token) {
@@ -207,11 +216,13 @@ export default function App() {
         } else {
           setLoading(false);
         }
-      } catch (err) {
-        console.error("Erro de Autenticação:", err);
+      } catch (err: any) {
+        console.error("Erro no redirecionamento do Google:", err);
+        setLoginError(`Erro de autenticação: ${err.message}`);
         setLoading(false);
       }
     };
+    
     initAuth();
 
     const unsubscribe = onAuthStateChanged(auth, (currentUser) => {
@@ -221,23 +232,11 @@ export default function App() {
     return () => unsubscribe();
   }, [isReadOnly]);
 
-  const handleGoogleLogin = async () => {
-    setLoading(true);
-    setLoginError(''); // Limpa erros antigos antes de tentar
-    try {
-      await signInWithPopup(auth, googleProvider);
-    } catch (err: any) {
-      console.error("Erro ao logar", err);
-      // Aqui a mágica acontece: Pega o erro do Firebase e joga na tela!
-      setLoginError(`Oops! Ocorreu um erro: ${err.message}`);
-      setLoading(false);
-    }
-  };
-
   const handleGoogleRedirect = async () => {
     setLoading(true);
-    setLoginError('');
+    setLoginError('A redirecionar de forma segura para o Google...');
     try {
+      // Usamos apenas REDIRECT agora! Nada de pop-ups bloqueados.
       await signInWithRedirect(auth, googleProvider);
     } catch (err: any) {
       setLoginError(`Erro: ${err.message}`);
@@ -398,7 +397,7 @@ export default function App() {
     return (
       <div className="min-h-screen bg-[#faf5f7] flex flex-col items-center justify-center gap-4">
         <div className="animate-spin text-pink-500"><Cloud size={48} /></div>
-        <h2 className="text-xl font-bold text-slate-700">Carregando Banco de Horas...</h2>
+        <h2 className="text-xl font-bold text-slate-700">A carregar Banco de Horas...</h2>
       </div>
     );
   }
@@ -412,10 +411,10 @@ export default function App() {
           </div>
           <div>
             <h1 className="text-3xl font-extrabold text-slate-800 tracking-tight mb-2">Banco de Horas</h1>
-            <p className="text-slate-500 font-medium">Faça login para aceder ao seu painel.</p>
+            <p className="text-slate-500 font-medium">Inicie sessão para aceder ao seu painel.</p>
           </div>
 
-          {/* O DETETIVE DE ERROS: Se der erro, aparece aqui na cor vermelha! */}
+          {/* O DETETIVE DE ERROS */}
           {loginError && (
             <div className="bg-rose-50 border border-rose-200 text-rose-700 p-4 rounded-xl text-xs font-bold text-left w-full break-words">
               {loginError}
@@ -423,7 +422,7 @@ export default function App() {
           )}
 
           <button 
-            onClick={handleGoogleLogin}
+            onClick={handleGoogleRedirect}
             className="w-full bg-pink-500 text-white p-4 rounded-2xl font-bold hover:bg-pink-600 transition-all flex items-center justify-center gap-3 text-lg shadow-md mt-4"
           >
             <LogIn size={24} />
@@ -439,7 +438,7 @@ export default function App() {
           </button>
           
           {/* O SELO DE GARANTIA: Confirmação visual de que o código atualizou */}
-          <p className="text-[11px] text-slate-400 font-bold mt-2">Versão 2.2 - Login à Prova de Bala</p>
+          <p className="text-[11px] text-slate-400 font-bold mt-2">Versão 2.4 - Chaves Originais da Ana</p>
         </div>
       </div>
     );
