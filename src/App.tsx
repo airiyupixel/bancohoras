@@ -332,14 +332,18 @@ export default function App() {
 
   const handleShare = () => {
     if (!user) return;
-    const shareUrl = `${window.location.origin}${window.location.pathname}?shareId=${user.uid}`;
+    
+    // Força SEMPRE o uso do link oficial público, ignorando se tu estás num link de "preview" do Vercel
+    const baseUrl = isOficial ? 'https://bancohoras.vercel.app' : window.location.origin;
+    const shareUrl = `${baseUrl}/?shareId=${user.uid}`;
+    
     const tempInput = document.createElement('input');
     tempInput.value = shareUrl;
     document.body.appendChild(tempInput);
     tempInput.select();
     document.execCommand('copy');
     document.body.removeChild(tempInput);
-    alert("Link copiado! Envie este link para a sua líder.");
+    alert("Link oficial copiado com sucesso! Envie este link para a sua líder.");
   };
 
   // --- Lógica de Cálculo ---
@@ -450,7 +454,7 @@ export default function App() {
           )}
           
           {/* O SELO DE GARANTIA */}
-          <p className="text-[11px] text-slate-400 font-bold mt-2">Versão 2.9 - Modo Líder Aprimorado</p>
+          <p className="text-[11px] text-slate-400 font-bold mt-2">Versão 2.10 - Link Seguro do Vercel</p>
         </div>
       </div>
     );
