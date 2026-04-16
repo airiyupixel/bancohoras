@@ -10,7 +10,7 @@ import {
 import { initializeApp } from 'firebase/app';
 import { 
   getAuth, signInWithCustomToken, signInAnonymously, onAuthStateChanged, 
-  GoogleAuthProvider, signOut, signInWithRedirect, getRedirectResult
+  GoogleAuthProvider, signOut, signInWithPopup, getRedirectResult
 } from 'firebase/auth';
 import { getFirestore, collection, doc, setDoc, onSnapshot } from 'firebase/firestore';
 
@@ -42,11 +42,7 @@ const db = getFirestore(app);
 // @ts-ignore
 const dbAppId = isOficial ? "meu-banco-de-horas-ana-azzas" : (typeof __app_id !== 'undefined' ? __app_id : 'default-app-id');
 
-// Configuração para FORÇAR o Google a mostrar a tela e evitar que feche sozinho
 const googleProvider = new GoogleAuthProvider();
-googleProvider.setCustomParameters({
-  prompt: 'select_account'
-});
 
 // --- Funções Utilitárias de Tempo ---
 const timeToMins = (timeStr: string) => {
@@ -159,7 +155,7 @@ export default function App() {
   const [syncStatus, setSyncStatus] = useState('synced');
   const [pendingSave, setPendingSave] = useState<any>(null);
   const [weather, setWeather] = useState<any>({});
-  const [loginError, setLoginError] = useState(''); // Estado para capturar o erro
+  const [loginError, setLoginError] = useState(''); 
   
   const urlParams = new URLSearchParams(window.location.search);
   const shareId = urlParams.get('shareId');
@@ -196,50 +192,51 @@ export default function App() {
      return '🌡️';
   };
 
-  // --- Autenticação (Focada 100% em Redirecionamento) ---
+  // --- Autenticação Robusta ---
   useEffect(() => {
-    const initAuth = async () => {
-      try {
-        // Passo 1: Verifica se o utilizador acabou de voltar do site do Google
-        const redirectResult = await getRedirectResult(auth);
-        if (redirectResult?.user) {
-          // Se voltou com sucesso, não precisa fazer mais nada
-          return;
-        }
+    setLoading(true);
 
+    // Captura qualquer erro sobrante de tentativas antigas de redirecionamento
+    getRedirectResult(auth).catch(err => {
+      console.error(err);
+      setLoginError("O navegador bloqueou os cookies. Usa o botão de Pop-up (rosa).");
+    });
+
+    const unsubscribe = onAuthStateChanged(auth, (currentUser) => {
+      if (currentUser) {
+        setUser(currentUser);
+        setLoading(false);
+      } else {
+        setUser(null);
         // @ts-ignore
         if (!isOficial && typeof __initial_auth_token !== 'undefined' && __initial_auth_token) {
           // @ts-ignore
-          await signInWithCustomToken(auth, __initial_auth_token);
+          signInWithCustomToken(auth, __initial_auth_token).catch(() => setLoading(false));
         } else if (isReadOnly) {
-          await signInAnonymously(auth);
+          signInAnonymously(auth).catch(() => setLoading(false));
         } else {
           setLoading(false);
         }
-      } catch (err: any) {
-        console.error("Erro no redirecionamento do Google:", err);
-        setLoginError(`Erro de autenticação: ${err.message}`);
-        setLoading(false);
       }
-    };
-    
-    initAuth();
-
-    const unsubscribe = onAuthStateChanged(auth, (currentUser) => {
-      setUser(currentUser);
-      if (currentUser || isReadOnly) setLoading(false);
     });
+
     return () => unsubscribe();
   }, [isReadOnly]);
 
-  const handleGoogleRedirect = async () => {
+  const handleGooglePopup = async () => {
     setLoading(true);
-    setLoginError('A redirecionar de forma segura para o Google...');
+    setLoginError('');
     try {
-      // Usamos apenas REDIRECT agora! Nada de pop-ups bloqueados.
-      await signInWithRedirect(auth, googleProvider);
+      // Usamos EXCLUSIVAMENTE o Pop-up
+      await signInWithPopup(auth, googleProvider);
     } catch (err: any) {
-      setLoginError(`Erro: ${err.message}`);
+      console.error("Erro no Popup:", err);
+      // O detetive descobre se a janela foi bloqueada pelo navegador
+      if (err.code === 'auth/popup-blocked' || err.code === 'auth/popup-closed-by-user') {
+        setLoginError('🚫 O TEU NAVEGADOR BLOQUEOU O LOGIN! Olha para a barra de endereço lá em cima, clica no ícone de "Pop-up bloqueado" e permite as janelas para este site. Depois clica novamente no botão!');
+      } else {
+        setLoginError(`Erro: ${err.message}`);
+      }
       setLoading(false);
     }
   };
@@ -416,29 +413,21 @@ export default function App() {
 
           {/* O DETETIVE DE ERROS */}
           {loginError && (
-            <div className="bg-rose-50 border border-rose-200 text-rose-700 p-4 rounded-xl text-xs font-bold text-left w-full break-words">
+            <div className="bg-rose-50 border border-rose-200 text-rose-700 p-4 rounded-xl text-sm font-bold text-left w-full break-words shadow-sm">
               {loginError}
             </div>
           )}
 
           <button 
-            onClick={handleGoogleRedirect}
+            onClick={handleGooglePopup}
             className="w-full bg-pink-500 text-white p-4 rounded-2xl font-bold hover:bg-pink-600 transition-all flex items-center justify-center gap-3 text-lg shadow-md mt-4"
           >
             <LogIn size={24} />
-            Entrar com o Google
-          </button>
-
-          <button 
-            onClick={handleGoogleRedirect}
-            className="w-full bg-white border-2 border-pink-200 text-pink-600 p-3 rounded-2xl font-bold hover:bg-pink-50 transition-all flex items-center justify-center gap-3 text-sm shadow-sm mt-2"
-          >
-            <LogIn size={18} />
-            Não funciona? Tentar Login Alternativo
+            Entrar de forma Segura
           </button>
           
-          {/* O SELO DE GARANTIA: Confirmação visual de que o código atualizou */}
-          <p className="text-[11px] text-slate-400 font-bold mt-2">Versão 2.4 - Chaves Originais da Ana</p>
+          {/* O SELO DE GARANTIA */}
+          <p className="text-[11px] text-slate-400 font-bold mt-2">Versão 2.5 - Sistema Anti-Bloqueio</p>
         </div>
       </div>
     );
